@@ -28,13 +28,13 @@ small{color:var(--mu)}
 <div class="card">
   <div class="row"><b>動画A</b><input type="text" id="u0" placeholder="YouTubeのURL"><button onclick="load(0)">読込</button></div>
   <div class="player"><div id="p0"></div></div>
-  <div class="row"><small>停止して</small><input type="number" id="h0" value="1" step="0.1" min="0"><small>秒後に再開</small><button class="sub" onclick="hold(0,+$('h0').value)">ストップ→再開</button></div>
+  <div class="row"><small>停止して</small><input type="number" id="h0" value="1" step="0.1" min="0"><small>秒後に再開</small><button class="sub" onclick="hold(0,+$('h0').value)">ストップ→再開</button><button class="sub" id="m0" onclick="toggleMute(0)">🔊 音あり</button></div>
 </div>
 
 <div class="card">
   <div class="row"><b>動画B</b><input type="text" id="u1" placeholder="YouTubeのURL"><button onclick="load(1)">読込</button></div>
   <div class="player"><div id="p1"></div></div>
-  <div class="row"><small>停止して</small><input type="number" id="h1" value="1" step="0.1" min="0"><small>秒後に再開</small><button class="sub" onclick="hold(1,+$('h1').value)">ストップ→再開</button></div>
+  <div class="row"><small>停止して</small><input type="number" id="h1" value="1" step="0.1" min="0"><small>秒後に再開</small><button class="sub" onclick="hold(1,+$('h1').value)">ストップ→再開</button><button class="sub" id="m1" onclick="toggleMute(1)">🔇 ミュート中</button></div>
 </div>
 
 <div class="card">
@@ -56,10 +56,15 @@ function load(i){
   const id=vid($('u'+i).value.trim());
   if(!id){alert('URLを確認してください');return}
   if(P[i]){P[i].loadVideoById(id);P[i].pauseVideo();return}
-  P[i]=new YT.Player('p'+i,{videoId:id,playerVars:{playsinline:1},width:'100%',height:'100%'});
+  P[i]=new YT.Player('p'+i,{videoId:id,playerVars:{playsinline:1,mute:i===1?1:0},width:'100%',height:'100%'});
 }
 const ready=i=>P[i]&&P[i].getCurrentTime;
 const playing=i=>ready(i)&&P[i].getPlayerState()===1;
+function toggleMute(i){
+  if(!ready(i))return;
+  if(P[i].isMuted()){P[i].unMute();$('m'+i).textContent='🔊 音あり'}
+  else{P[i].mute();$('m'+i).textContent='🔇 ミュート中'}
+}
 function playAll(){[0,1].forEach(i=>ready(i)&&P[i].playVideo())}
 function pauseAll(){[0,1].forEach(i=>ready(i)&&P[i].pauseVideo())}
 function hold(i,sec){

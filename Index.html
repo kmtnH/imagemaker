@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube 同時再生シンク</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--card:#f3f3f5;--ac:#d62828;--mu:#666}
+@media (prefers-color-scheme:dark){:root{--bg:#141416;--fg:#eee;--card:#222226;--mu:#aaa}}
+*{box-sizing:border-box}
+body{margin:0;padding:12px;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;max-width:900px;margin-inline:auto}
+h1{font-size:18px;margin:4px 0 12px}
+.card{background:var(--card);border-radius:10px;padding:10px;margin-bottom:12px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}
+input[type=text]{flex:1;min-width:0;padding:8px;border-radius:6px;border:1px solid #8884;background:var(--bg);color:var(--fg)}
+input[type=number]{width:70px;padding:6px;border-radius:6px;border:1px solid #8884;background:var(--bg);color:var(--fg)}
+button{padding:8px 12px;border:0;border-radius:6px;background:var(--ac);color:#fff;font-size:14px}
+button.sub{background:#888}
+.player{aspect-ratio:16/9;background:#000;border-radius:6px;overflow:hidden}
+.player iframe{width:100%;height:100%}
+#diff{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+small{color:var(--mu)}
+</style>
+</head>
+<body>
+<h1>YouTube 同時再生シンク</h1>
+
+<div class="card">
+  <div class="row"><b>動画A</b><input type="text" id="u0" placeholder="YouTubeのURL"><button onclick="load(0)">読込</button></div>
+  <div class="player"><div id="p0"></div></div>
+  <div class="row"><small>停止して</small><input type="number" id="h0" value="1" step="0.1" min="0"><small>秒後に再開</small><button class="sub" onclick="hold(0,+$('h0').value)">ストップ→再開</button></div>
+</div>
+
+<div class="card">
+  <div class="row"><b>動画B</b><input type="text" id="u1" placeholder="YouTubeのURL"><button onclick="load(1)">読込</button></div>
+  <div class="player"><div id="p1"></div></div>
+  <div class="row"><small>停止して</small><input type="number" id="h1" value="1" step="0.1" min="0"><small>秒後に再開</small><button class="sub" onclick="hold(1,+$('h1').value)">ストップ→再開</button></div>
+</div>
+
+<div class="card">
+  <div class="row"><button onclick="playAll()">▶ 同時再生</button><button class="sub" onclick="pauseAll()">⏸ 同時停止</button></div>
+  <div class="row">ズレ(B−A): <span id="diff">--</span> 秒</div>
+  <div class="row"><small>Bの基準オフセット</small><input type="number" id="off" value="0" step="0.1"><small>秒（Bが本来Aよりこれだけ先なら入力）</small></div>
+  <div class="row"><button onclick="correct()">今すぐズレ補正</button>
+    <label><input type="checkbox" id="auto"> 自動補正</label>
+    <small>しきい値</small><input type="number" id="th" value="0.3" step="0.1" min="0.1"><small>秒</small></div>
+  <small>進んでいる側をズレ分だけ停止し、自動で再開します。</small>
+</div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+const $=id=>document.getElementById(id);
+const P=[null,null], busy=[false,false];
+function vid(u){const m=u.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{11})/)||u.match(/^([\w-]{11})$/);return m&&m[1]}
+function load(i){
+  const id=vid($('u'+i).value.trim());
+  if(!id){alert('URLを確認してください');return}
+  if(P[i]){P[i].loadVideoById(id);P[i].pauseVideo();return}
+  P[i]=new YT.Player('p'+i,{videoId:id,playerVars:{playsinline:1},width:'100%',height:'100%'});
+}
+const ready=i=>P[i]&&P[i].getCurrentTime;
+const playing=i=>ready(i)&&P[i].getPlayerState()===1;
+function playAll(){[0,1].forEach(i=>ready(i)&&P[i].playVideo())}
+function pauseAll(){[0,1].forEach(i=>ready(i)&&P[i].pauseVideo())}
+function hold(i,sec){
+  if(!ready(i)||busy[i])return;
+  busy[i]=true;P[i].pauseVideo();
+  setTimeout(()=>{P[i].playVideo();busy[i]=false},sec*1000);
+}
+function diff(){
+  if(!ready(0)||!ready(1))return null;
+  return (P[1].getCurrentTime()-(+$('off').value||0))-P[0].getCurrentTime();
+}
+function correct(auto){
+  const d=diff();
+  if(d===null||!playing(0)||!playing(1))return;
+  if(auto&&Math.abs(d)<(+$('th').value||0.3))return;
+  if(d>0)hold(1,d); else hold(0,-d);
+}
+setInterval(()=>{const d=diff();$('diff').textContent=d===null?'--':d.toFixed(2)},200);
+setInterval(()=>{if($('auto').checked)correct(true)},1000);
+</script>
+</body>
+</html>

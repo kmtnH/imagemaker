@@ -2,48 +2,85 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>YouTube 同時再生シンク</title>
 <style>
-:root{--bg:#fff;--fg:#1a1a1a;--card:#f1f1f4;--ac:#d62828;--mu:#666}
+:root{--bg:#fff;--fg:#1a1a1a;--card:#f1f1f4;--ac:#d62828;--mu:#666;--hh:48px}
 @media (prefers-color-scheme:dark){:root{--bg:#121214;--fg:#eee;--card:#222226;--mu:#aaa}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;font-size:14px}
-input[type=text],input[type=number]{padding:7px;border-radius:6px;border:1px solid #8885;background:var(--bg);color:var(--fg);min-width:0}
-input[type=number]{width:64px}
-button{padding:7px 10px;border:0;border-radius:6px;background:var(--ac);color:#fff;font-size:13px}
+html{-webkit-text-size-adjust:100%}
+/* 画面いっぱいに固定。ページ自体はスクロールしないので動画の位置が動かない */
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;font-size:14px;
+  height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+/* iOSは16px未満の入力欄でズームして画面がずれるので16pxにする */
+input[type=text],input[type=number]{font-size:16px;padding:8px;border-radius:8px;border:1px solid #8885;background:var(--bg);color:var(--fg);min-width:0}
+input[type=number]{width:72px}
+input[type=checkbox]{width:18px;height:18px;vertical-align:middle}
+button{padding:8px 12px;min-height:40px;border:0;border-radius:8px;background:var(--ac);color:#fff;font-size:14px;touch-action:manipulation}
 button.s{background:#777}
-.bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px;background:var(--card)}
+small{color:var(--mu)}
+
+/* 上のバー: 高さ固定 */
+.top{flex:none;height:var(--hh);display:flex;gap:8px;align-items:center;padding:0 max(8px,env(safe-area-inset-left));background:var(--card)}
+.top button{min-height:36px;padding:6px 14px;border-radius:999px;white-space:nowrap}
+
+/* 動画を選ぶパネル: 動画の上に重ねて表示するだけで、動画の位置は動かさない */
+#pick{display:none;position:fixed;z-index:20;left:0;right:0;top:calc(var(--hh) + env(safe-area-inset-top));
+  max-height:calc(100dvh - var(--hh) - env(safe-area-inset-top));overflow-y:auto;background:var(--card);
+  padding:8px max(8px,env(safe-area-inset-left));box-shadow:0 10px 24px #0007}
+#pick.open{display:block}
+.bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
 .bar input[type=text]{flex:1;min-width:120px}
-#res{display:none;overflow-x:auto;white-space:nowrap;background:var(--card);padding:4px 6px}
+#res{display:none;overflow-x:auto;white-space:nowrap;padding:4px 0}
 .it{display:inline-block;width:150px;margin-right:8px;vertical-align:top;white-space:normal;font-size:11px}
 .it img{width:150px;height:84px;object-fit:cover;border-radius:4px}
 .it div{height:30px;overflow:hidden}
-.stage{display:grid;grid-template-columns:1fr;gap:0}
-@media (orientation:landscape){.stage{grid-template-columns:1fr 1fr}}
-.pw{position:relative;background:#000}
-.player{aspect-ratio:16/9}
+
+/* 動画: 縦持ちは上下、横持ちは左右。大きさは画面幅だけで決まる */
+.stage{flex:none;display:grid;grid-template-columns:1fr;background:#000}
+.pw{position:relative}
+.player{width:100%;aspect-ratio:16/9}
 .player iframe{width:100%;height:100%;display:block}
 .tm{position:absolute;left:6px;top:6px;background:#000b;color:#fff;padding:3px 8px;border-radius:6px;font:700 17px ui-monospace,monospace;pointer-events:none}
-.ctl{position:sticky;bottom:0;background:var(--card);padding:6px;border-top:1px solid #8884}
-.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0}
-#diff{font:700 20px ui-monospace,monospace;min-width:70px}
-small{color:var(--mu)}
+@media (orientation:landscape){
+  .stage{grid-template-columns:1fr 1fr}
+  .pw{display:flex;justify-content:center}
+  .player{width:auto;height:min(calc(50vw * 9 / 16),calc(100dvh - var(--hh) - 64px))}
+}
+
+/* 操作エリア: 動画の下に置く。足りなければここだけスクロールする */
+.ctl{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;background:var(--card);-webkit-overflow-scrolling:touch;
+  padding-bottom:env(safe-area-inset-bottom)}
+.main{position:sticky;top:0;z-index:1;display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px max(8px,env(safe-area-inset-left));
+  background:var(--card);border-bottom:1px solid #8884}
+.more{padding:6px max(8px,env(safe-area-inset-left)) 12px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+#diff{font:700 20px ui-monospace,monospace;min-width:64px;text-align:right}
 </style>
 </head>
 <body>
 
-<div class="bar">
-  <input type="text" id="q" placeholder="配信・動画を検索">
-  <label><input type="checkbox" id="live"> 配信のみ</label>
-  <button onclick="search()">検索</button>
-  <button class="s" onclick="setKey()">APIキー</button>
+<div class="top">
+  <button id="pickBtn" onclick="togglePick()">🔍 動画を選ぶ</button>
+  <button class="s" id="m0" onclick="toggleMute(0)">🔊 A</button>
+  <button class="s" id="m1" onclick="toggleMute(1)">🔇 B</button>
 </div>
-<div class="bar">
-  <input type="text" id="u0" placeholder="A: URL"><button onclick="load(0)">A読込</button>
-  <input type="text" id="u1" placeholder="B: URL"><button onclick="load(1)">B読込</button>
+
+<div id="pick">
+  <div class="bar">
+    <input type="text" id="q" placeholder="配信・動画を検索">
+    <label><input type="checkbox" id="live"> 配信のみ</label>
+    <button onclick="search()">検索</button>
+    <button class="s" onclick="setKey()">APIキー</button>
+  </div>
+  <div class="bar">
+    <input type="text" id="u0" placeholder="A: URL"><button onclick="load(0)">A読込</button>
+  </div>
+  <div class="bar">
+    <input type="text" id="u1" placeholder="B: URL"><button onclick="load(1)">B読込</button>
+  </div>
+  <div id="res"></div>
 </div>
-<div id="res"></div>
 
 <div class="stage">
   <div class="pw"><div class="player"><div id="p0"></div></div><div class="tm" id="t0">A --</div></div>
@@ -51,28 +88,29 @@ small{color:var(--mu)}
 </div>
 
 <div class="ctl">
-  <div class="row">
-    <button onclick="playAll()">▶ 同時再生</button><button class="s" onclick="pauseAll()">⏸</button>
-    <span>ズレ</span><span id="diff">--</span><small>秒(B−A)</small>
+  <div class="main">
+    <button onclick="playAll()">▶ 同時再生</button>
+    <button class="s" onclick="pauseAll()">⏸</button>
+    <span id="diff">--</span><small>秒(B−A)</small>
     <label><input type="checkbox" id="auto"> 自動補正</label>
     <button class="s" onclick="correct()">今すぐ補正</button>
   </div>
-  <div class="row">
-    <b>声で合わせる:</b><small>同じ声が聞こえた瞬間に</small>
-    <button onclick="mark(0)">A今!</button><button onclick="mark(1)">B今!</button>
-    <small id="ms"></small>
-  </div>
-  <div class="row">
-    <small>B基準オフセット</small><button class="s" onclick="nudge(-.1)">−0.1</button>
-    <input type="number" id="off" value="0" step="0.1"><button class="s" onclick="nudge(.1)">+0.1</button>
-    <small>しきい値</small><input type="number" id="th" value="0.3" step="0.1" min="0.1">
-  </div>
-  <div class="row">
-    <small>手動停止</small><input type="number" id="hs" value="1" step="0.1" min="0">
-    <button class="s" onclick="hold(0,+$('hs').value)">A停止→再開</button>
-    <button class="s" onclick="hold(1,+$('hs').value)">B停止→再開</button>
-    <button class="s" id="m0" onclick="toggleMute(0)">🔊 A</button>
-    <button class="s" id="m1" onclick="toggleMute(1)">🔇 B</button>
+  <div class="more">
+    <div class="row">
+      <b>声で合わせる:</b><small>同じ声が聞こえた瞬間に</small>
+      <button onclick="mark(0)">A今!</button><button onclick="mark(1)">B今!</button>
+      <small id="ms"></small>
+    </div>
+    <div class="row">
+      <small>B基準オフセット</small><button class="s" onclick="nudge(-.1)">−0.1</button>
+      <input type="number" id="off" value="0" step="0.1"><button class="s" onclick="nudge(.1)">+0.1</button>
+      <small>しきい値</small><input type="number" id="th" value="0.3" step="0.1" min="0.1">
+    </div>
+    <div class="row">
+      <small>手動停止</small><input type="number" id="hs" value="1" step="0.1" min="0">
+      <button class="s" onclick="hold(0,+$('hs').value)">A停止→再開</button>
+      <button class="s" onclick="hold(1,+$('hs').value)">B停止→再開</button>
+    </div>
   </div>
 </div>
 
@@ -81,6 +119,10 @@ small{color:var(--mu)}
 const $=id=>document.getElementById(id);
 const P=[null,null],busy=[false,false];let mk=[null,null];
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function togglePick(){
+  const o=$('pick').classList.toggle('open');
+  $('pickBtn').textContent=o?'✕ 閉じる':'🔍 動画を選ぶ';
+}
 function vid(u){const m=u.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{11})/)||u.match(/^([\w-]{11})$/);return m&&m[1]}
 function loadId(i,id){
   $('u'+i).value=id;
